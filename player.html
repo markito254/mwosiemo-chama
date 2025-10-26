@@ -48,35 +48,34 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
   <script>
-  <script>
-  // ✅ Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyBz5muqVYqFi9VHCmcM6fAgrLhvZ24rvX0",
-    authDomain: "mwosiemo-ae343.firebaseapp.com",
-    databaseURL: "https://mwosiemo-ae343-default-rtdb.europe-west1.firebasedatabase.app/",
-    projectId: "mwosiemo-ae343",
-    storageBucket: "mwosiemo-ae343.appspot.com",
-    messagingSenderId: "492853634233",
-    appId: "1:492853634233:web:31bd69c07af243ea746768",
-    measurementId: "G-9849VJZCSX"
-  };
+    // ✅ Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBz5muqVYqFi9VHCmcM6fAgrLhvZ24rvX0",
+      authDomain: "mwosiemo-ae343.firebaseapp.com",
+      databaseURL: "https://mwosiemo-ae343-default-rtdb.europe-west1.firebasedatabase.app/",
+      projectId: "mwosiemo-ae343",
+      storageBucket: "mwosiemo-ae343.appspot.com",
+      messagingSenderId: "492853634233",
+      appId: "1:492853634233:web:31bd69c07af243ea746768",
+      measurementId: "G-9849VJZCSX"
+    };
 
-  // ✅ Initialize Firebase
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-</script>
+    // ✅ Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-
-    // 🔹 STEP 2: Ask player name
+    // 🔹 Ask player name
     const playerName = prompt("Enter your name:");
     document.getElementById("welcome").textContent = `Welcome, ${playerName}!`;
 
-    // 🔹 STEP 3: Listen for total boxes from Firebase
+    // 🔹 Listen for total boxes from Firebase
     db.ref("gameSettings/totalBoxes").on("value", (snapshot) => {
       const total = snapshot.val();
       if (!total) return;
+
       const boxesDiv = document.getElementById("boxes");
       boxesDiv.innerHTML = "";
+
       for (let i = 1; i <= total; i++) {
         const box = document.createElement("div");
         box.textContent = i;
@@ -86,7 +85,7 @@
       }
     });
 
-    // 🔹 STEP 4: Handle box selection
+    // 🔹 Handle box selection
     function selectBox(number, box) {
       db.ref("gameSettings").once("value").then(snapshot => {
         const settings = snapshot.val();
@@ -94,14 +93,16 @@
           alert("Game not started yet. Wait for admin.");
           return;
         }
+
         db.ref(`players/${playerName}`).set({ box: number });
         const isWinner = number === settings.winningBox;
+
         box.classList.add(isWinner ? "winner" : "loser");
         alert(isWinner ? "🎉 Congratulations! You won!" : "😢 Better luck next time!");
+
         document.querySelectorAll(".box").forEach(b => b.onclick = null);
       });
     }
   </script>
 </body>
 </html>
-
