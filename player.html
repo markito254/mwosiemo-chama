@@ -1,101 +1,103 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Lucky Box Game</title>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lucky Box Challenge</title>
   <style>
-    .box {
-      width: 100px; height: 100px; margin: 10px;
-      display: inline-block; background: gold;
-      text-align: center; line-height: 100px;
-      font-size: 24px; cursor: pointer; border-radius: 10px;
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f4f4f4;
     }
-    .disabled { background: gray; cursor: not-allowed; }
-    .winner { background: green; color: white; }
-    .loser { background: red; color: white; }
+    h1 {
+      color: #333;
+    }
+    #boxes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+      gap: 10px;
+      max-width: 400px;
+      margin: 20px auto;
+    }
+    .box {
+      background-color: gold;
+      padding: 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.2s, background-color 0.2s;
+    }
+    .box:hover {
+      transform: scale(1.1);
+    }
+    .winner {
+      background-color: lightgreen !important;
+    }
+    .loser {
+      background-color: #ff8a8a !important;
+    }
   </style>
 </head>
 <body>
-<h2>Pick a Box</h2>
-<div id="boxes"></div>
+  <h1>Lucky Box Challenge 🎁</h1>
+  <p id="welcome"></p>
+  <div id="boxes"></div>
 
-<script>
-  // --- Firebase Setup ---
-  const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "SENDER_ID",
-    appId: "APP_ID"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-  // --- Player Setup ---
-  let playerName = prompt("Enter your name:");
-  if (!playerName) playerName = "Player" + Math.floor(Math.random()*1000);
+  <script>
+    // 🔹 STEP 1: PASTE YOUR FIREBASE CONFIG HERE (inside the curly braces)
+    const firebaseConfig = {
+     // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBz5muqVYqFi9VHCmcM6fAgrLhvZ24rvX0",
+  authDomain: "mwosiemo-ae343.firebaseapp.com",
+  projectId: "mwosiemo-ae343",
+  storageBucket: "mwosiemo-ae343.firebasestorage.app",
+  messagingSenderId: "492853634233",
+  appId: "1:492853634233:web:31bd69c07af243ea746768",
+  measurementId: "G-9849VJZCSX"
+};
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-  const boxesDiv = document.getElementById('boxes');
-  let totalBoxes = 5;  // default
-  let winningBox = null;
+    // 🔹 STEP 2: Ask player name
+    const playerName = prompt("Enter your name:");
+    document.getElementById("welcome").textContent = `Welcome, ${playerName}!`;
 
-  // --- Get totalBoxes from Firebase ---
-  db.ref('gameSettings/totalBoxes').on('value', snapshot => {
-    const val = snapshot.val();
-    if (val) totalBoxes = val;
-    createBoxes();
-  });
-
-  function createBoxes() {
-    boxesDiv.innerHTML = '';
-    for (let i = 1; i <= totalBoxes; i++) {
-      const box = document.createElement('div');
-      box.className = 'box';
-      box.innerText = i;
-      box.onclick = () => pickBox(i, box);
-      boxesDiv.appendChild(box);
-    }
-  }
-
-  function pickBox(boxNumber, boxDiv) {
-    // Prevent multiple clicks
-    if (boxDiv.classList.contains('disabled')) return;
-
-    // Disable all boxes after pick
-    document.querySelectorAll('.box').forEach(b => b.classList.add('disabled'));
-
-    // Generate winning box if not set yet
-    db.ref('currentRound/winningBox').get().then(snapshot => {
-      if (!snapshot.exists()) {
-        winningBox = Math.floor(Math.random() * totalBoxes) + 1;
-        db.ref('currentRound/winningBox').set(winningBox);
-      } else {
-        winningBox = snapshot.val();
+    // 🔹 STEP 3: Listen for total boxes from Firebase
+    db.ref("gameSettings/totalBoxes").on("value", (snapshot) => {
+      const total = snapshot.val();
+      if (!total) return;
+      const boxesDiv = document.getElementById("boxes");
+      boxesDiv.innerHTML = "";
+      for (let i = 1; i <= total; i++) {
+        const box = document.createElement("div");
+        box.textContent = i;
+        box.classList.add("box");
+        box.onclick = () => selectBox(i, box);
+        boxesDiv.appendChild(box);
       }
-
-      // Save player choice
-      db.ref('choices/' + playerName).set({ box: boxNumber });
-
-      // Show result
-      if (boxNumber === winningBox) {
-        boxDiv.classList.add('winner');
-        alert("🎉 Congratulations! You won!");
-      } else {
-        boxDiv.classList.add('loser');
-        alert("Better luck next time!");
-      }
-
-      // Highlight winning box
-      document.querySelectorAll('.box').forEach(b => {
-        if (parseInt(b.innerText) === winningBox && boxNumber !== winningBox) {
-          b.classList.add('winner');
-        }
-      });
     });
-  }
-</script>
+
+    // 🔹 STEP 4: Handle box selection
+    function selectBox(number, box) {
+      db.ref("gameSettings").once("value").then(snapshot => {
+        const settings = snapshot.val();
+        if (!settings || !settings.winningBox) {
+          alert("Game not started yet. Wait for admin.");
+          return;
+        }
+        db.ref(`players/${playerName}`).set({ box: number });
+        const isWinner = number === settings.winningBox;
+        box.classList.add(isWinner ? "winner" : "loser");
+        alert(isWinner ? "🎉 Congratulations! You won!" : "😢 Better luck next time!");
+        document.querySelectorAll(".box").forEach(b => b.onclick = null);
+      });
+    }
+  </script>
 </body>
 </html>
