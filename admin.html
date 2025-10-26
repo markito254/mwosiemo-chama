@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lucky Box Admin</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+</head>
+<body>
+<h2>Admin Dashboard</h2>
+
+<label>Total Boxes for Next Round: </label>
+<input type="number" id="totalBoxesInput" min="1" value="5">
+<button id="setBoxes">Set</button>
+
+<h3>Player Selections</h3>
+<ul id="playerList"></ul>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "SENDER_ID",
+    appId: "APP_ID"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const playerList = document.getElementById('playerList');
+  const totalBoxesInput = document.getElementById('totalBoxesInput');
+  const setBoxesBtn = document.getElementById('setBoxes');
+
+  // Set total boxes for next round
+  setBoxesBtn.onclick = () => {
+    const val = parseInt(totalBoxesInput.value);
+    if (val > 0) db.ref('gameSettings/totalBoxes').set(val);
+    // Reset choices and current round
+    db.ref('choices').remove();
+    db.ref('currentRound').remove();
+    alert("New round started!");
+  };
+
+  // Listen for player choices
+  db.ref('choices').on('value', snapshot => {
+    playerList.innerHTML = '';
+    const data = snapshot.val();
+    if (!data) return;
+    for (const player in data) {
+      const li = document.createElement('li');
+      li.innerText = `${player} picked Box ${data[player].box}`;
+      playerList.appendChild(li);
+    }
+  });
+</script>
+</body>
+</html>

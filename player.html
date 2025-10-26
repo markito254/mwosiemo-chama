@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Lucky Box Game</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  <style>
+    .box {
+      width: 100px; height: 100px; margin: 10px;
+      display: inline-block; background: gold;
+      text-align: center; line-height: 100px;
+      font-size: 24px; cursor: pointer; border-radius: 10px;
+    }
+    .disabled { background: gray; cursor: not-allowed; }
+    .winner { background: green; color: white; }
+    .loser { background: red; color: white; }
+  </style>
+</head>
+<body>
+<h2>Pick a Box</h2>
+<div id="boxes"></div>
+
+<script>
+  // --- Firebase Setup ---
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "SENDER_ID",
+    appId: "APP_ID"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // --- Player Setup ---
+  let playerName = prompt("Enter your name:");
+  if (!playerName) playerName = "Player" + Math.floor(Math.random()*1000);
+
+  const boxesDiv = document.getElementById('boxes');
+  let totalBoxes = 5;  // default
+  let winningBox = null;
+
+  // --- Get totalBoxes from Firebase ---
+  db.ref('gameSettings/totalBoxes').on('value', snapshot => {
+    const val = snapshot.val();
+    if (val) totalBoxes = val;
+    createBoxes();
+  });
+
+  function createBoxes() {
+    boxesDiv.innerHTML = '';
+    for (let i = 1; i <= totalBoxes; i++) {
+      const box = document.createElement('div');
+      box.className = 'box';
+      box.innerText = i;
+      box.onclick = () => pickBox(i, box);
+      boxesDiv.appendChild(box);
+    }
+  }
+
+  function pickBox(boxNumber, boxDiv) {
+    // Prevent multiple clicks
+    if (boxDiv.classList.contains('disabled')) return;
+
+    // Disable all boxes after pick
+    document.querySelectorAll('.box').forEach(b => b.classList.add('disabled'));
+
+    // Generate winning box if not set yet
+    db.ref('currentRound/winningBox').get().then(snapshot => {
+      if (!snapshot.exists()) {
+        winningBox = Math.floor(Math.random() * totalBoxes) + 1;
+        db.ref('currentRound/winningBox').set(winningBox);
+      } else {
+        winningBox = snapshot.val();
+      }
+
+      // Save player choice
+      db.ref('choices/' + playerName).set({ box: boxNumber });
+
+      // Show result
+      if (boxNumber === winningBox) {
+        boxDiv.classList.add('winner');
+        alert("🎉 Congratulations! You won!");
+      } else {
+        boxDiv.classList.add('loser');
+        alert("Better luck next time!");
+      }
+
+      // Highlight winning box
+      document.querySelectorAll('.box').forEach(b => {
+        if (parseInt(b.innerText) === winningBox && boxNumber !== winningBox) {
+          b.classList.add('winner');
+        }
+      });
+    });
+  }
+</script>
+</body>
+</html>
