@@ -55,24 +55,21 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
   <script>
- <script>
-  // ✅ Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyBz5muqVYqFi9VHCmcM6fAgrLhvZ24rvX0",
-    authDomain: "mwosiemo-ae343.firebaseapp.com",
-    databaseURL: "https://mwosiemo-ae343-default-rtdb.europe-west1.firebasedatabase.app/",
-    projectId: "mwosiemo-ae343",
-    storageBucket: "mwosiemo-ae343.appspot.com",
-    messagingSenderId: "492853634233",
-    appId: "1:492853634233:web:31bd69c07af243ea746768",
-    measurementId: "G-9849VJZCSX"
-  };
+    // ✅ Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBz5muqVYqFi9VHCmcM6fAgrLhvZ24rvX0",
+      authDomain: "mwosiemo-ae343.firebaseapp.com",
+      databaseURL: "https://mwosiemo-ae343-default-rtdb.europe-west1.firebasedatabase.app/",
+      projectId: "mwosiemo-ae343",
+      storageBucket: "mwosiemo-ae343.appspot.com",
+      messagingSenderId: "492853634233",
+      appId: "1:492853634233:web:31bd69c07af243ea746768",
+      measurementId: "G-9849VJZCSX"
+    };
 
-  // ✅ Initialize Firebase
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-</script>
-
+    // ✅ Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
     // 🔹 STEP 2: Start a new round
     document.getElementById("startRoundBtn").addEventListener("click", () => {
@@ -114,4 +111,3 @@
   </script>
 </body>
 </html>
-
