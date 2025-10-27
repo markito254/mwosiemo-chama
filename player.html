@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lucky Box Challenge</title>
   <style>
     body {
@@ -25,6 +25,7 @@
       padding: 20px;
       border-radius: 10px;
       cursor: pointer;
+      position: relative;
       transition: transform 0.2s, background-color 0.2s;
     }
     .box:hover {
@@ -35,6 +36,17 @@
     }
     .loser {
       background-color: #ff8a8a !important;
+    }
+    .disabled {
+      pointer-events: none;
+      opacity: 0.6;
+    }
+    canvas {
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      pointer-events: none;
     }
   </style>
 </head>
@@ -48,7 +60,7 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
   <script>
-    // ✅ Firebase configuration
+    // ✅ Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyBz5muqVYqFi9VHCmcM6fAgrLhvZ24rvX0",
       authDomain: "mwosiemo-ae343.firebaseapp.com",
@@ -60,19 +72,17 @@
       measurementId: "G-9849VJZCSX"
     };
 
-    // ✅ Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 🔹 Ask player name
+    // Ask for player name
     const playerName = prompt("Enter your name:");
     document.getElementById("welcome").textContent = `Welcome, ${playerName}!`;
 
-    // 🔹 Listen for total boxes from Firebase
+    // 🔹 Render boxes based on game settings
     db.ref("gameSettings/totalBoxes").on("value", (snapshot) => {
       const total = snapshot.val();
       if (!total) return;
-
       const boxesDiv = document.getElementById("boxes");
       boxesDiv.innerHTML = "";
 
@@ -80,12 +90,48 @@
         const box = document.createElement("div");
         box.textContent = i;
         box.classList.add("box");
+        box.id = `box-${i}`;
         box.onclick = () => selectBox(i, box);
         boxesDiv.appendChild(box);
       }
+
+      // Update box states live
+      db.ref("players").on("value", (snap) => {
+        const players = snap.val() || {};
+        const chosenBoxes = Object.values(players).map(p => p.box);
+
+        document.querySelectorAll(".box").forEach(b => {
+          const num = parseInt(b.textContent);
+          if (chosenBoxes.includes(num)) {
+            b.classList.add("disabled");
+            b.onclick = null;
+          }
+        });
+
+        // If all boxes are taken
+        if (chosenBoxes.length === total) {
+          alert("All boxes taken — wait for admin to start the next round.");
+        }
+      });
+
+      // Listen for winner broadcast
+      db.ref("gameSettings/winnerFound").on("value", (snap) => {
+        if (snap.val()) {
+          db.ref("gameSettings/winningBox").once("value").then(s => {
+            const winBox = s.val();
+            const box = document.getElementById(`box-${winBox}`);
+            if (box) {
+              showConfetti(box);
+              box.classList.add("winner");
+              alert(`🎉 Box ${winBox} is the winner!`);
+              document.querySelectorAll(".box").forEach(b => b.onclick = null);
+            }
+          });
+        }
+      });
     });
 
-    // 🔹 Handle box selection
+    // 🔹 Handle selection
     function selectBox(number, box) {
       db.ref("gameSettings").once("value").then(snapshot => {
         const settings = snapshot.val();
@@ -94,14 +140,68 @@
           return;
         }
 
-        db.ref(`players/${playerName}`).set({ box: number });
-        const isWinner = number === settings.winningBox;
+        // Prevent double-picking
+        db.ref("players").once("value").then(playersSnap => {
+          const players = playersSnap.val() || {};
+          const chosen = Object.values(players).map(p => p.box);
+          if (chosen.includes(number)) {
+            alert("That box is already taken!");
+            return;
+          }
 
-        box.classList.add(isWinner ? "winner" : "loser");
-        alert(isWinner ? "🎉 Congratulations! You won!" : "😢 Better luck next time!");
+          db.ref(`players/${playerName}`).set({ box: number });
 
-        document.querySelectorAll(".box").forEach(b => b.onclick = null);
+          const isWinner = number === settings.winningBox;
+          box.classList.add(isWinner ? "winner" : "loser");
+          document.querySelectorAll(".box").forEach(b => b.onclick = null);
+
+          if (isWinner) {
+            showConfetti(box);
+            alert("🎉 Congratulations! You won!");
+            db.ref("gameSettings/winnerFound").set(true);
+            db.ref("adminNotifications").push({
+              winner: playerName,
+              winningBox: number,
+              timestamp: Date.now()
+            });
+          } else {
+            alert("😢 Better luck next time!");
+          }
+        });
       });
+    }
+
+    // 🎊 Lightweight confetti above winner's box
+    function showConfetti(box) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 150;
+      canvas.height = 100;
+      box.appendChild(canvas);
+      const ctx = canvas.getContext("2d");
+
+      const confetti = Array.from({ length: 20 }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        r: Math.random() * 3 + 2,
+        c: `hsl(${Math.random() * 360}, 100%, 50%)`,
+        s: Math.random() * 2 + 1
+      }));
+
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        confetti.forEach(p => {
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, 2 * Math.PI);
+          ctx.fillStyle = p.c;
+          ctx.fill();
+          p.y += p.s;
+          if (p.y > canvas.height) p.y = 0;
+        });
+        requestAnimationFrame(animate);
+      }
+      animate();
+
+      setTimeout(() => canvas.remove(), 4000);
     }
   </script>
 </body>
