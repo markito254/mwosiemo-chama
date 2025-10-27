@@ -1,144 +1,148 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lucky Box Admin Panel</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lucky Box — Admin</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f0f4f8;
-      text-align: center;
-      padding: 20px;
+    body { font-family: Arial, sans-serif; background:#f0f4f8; padding:20px; text-align:center; }
+    h1 { color:#333; }
+    .controls { margin:14px 0; }
+    input, button { padding:10px; border-radius:6px; border:1px solid #ccc; margin:4px; }
+    button { background:#007bff; color:#fff; cursor:pointer; }
+    #playerList { margin-top:18px; display:inline-block; text-align:left; min-width:320px; background:#fff; padding:12px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.06); }
+    .player-item { padding:8px 6px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; }
+    .player-item.winner { background:#dff7de; font-weight:700; border-left:4px solid #37b24d; }
+    #banner {
+      position: fixed; top: 16px; left:50%; transform:translateX(-50%); background:#2f9e44; color:#fff; padding:10px 16px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.15);
+      display:none; z-index:9999; font-weight:700;
     }
-    h1 {
-      color: #333;
-    }
-    input, button {
-      padding: 10px;
-      margin: 5px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
-    }
-    button {
-      background-color: #007bff;
-      color: white;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    #playerList {
-      margin-top: 20px;
-      text-align: left;
-      display: inline-block;
-      background: white;
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-      min-width: 300px;
-    }
-    .winner {
-      background-color: lightgreen;
-      font-weight: bold;
-    }
+    #stats { margin-top:8px; color:#333; }
   </style>
 </head>
 <body>
-  <h1>🎯 Lucky Box Admin Panel</h1>
-  <p>Set the number of boxes and start a new round.</p>
+  <h1>🎯 Lucky Box — Admin Panel</h1>
 
-  <label for="boxCount">Number of Boxes:</label>
-  <input type="number" id="boxCount" min="1" placeholder="e.g., 10">
-  <button id="startRoundBtn">Start New Round</button>
+  <div class="controls">
+    <label>Boxes: <input id="boxCount" type="number" min="1" placeholder="e.g., 5" /></label>
+    <button id="startBtn">Start New Round</button>
+  </div>
 
-  <h2>Player Choices</h2>
+  <div id="stats">No round active</div>
+
+  <h3>Player choices</h3>
   <div id="playerList">Waiting for players...</div>
 
-  <!-- Firebase SDK -->
+  <div id="banner"></div>
+
+  <!-- Firebase v8 -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
   <script>
-    // ✅ Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyBz5muqVYqFi9VHCmcM6fAgrLhvZ24rvX0",
-      authDomain: "mwosiemo-ae343.firebaseapp.com",
-      databaseURL: "https://mwosiemo-ae343-default-rtdb.europe-west1.firebasedatabase.app/",
-      projectId: "mwosiemo-ae343",
-      storageBucket: "mwosiemo-ae343.appspot.com",
-      messagingSenderId: "492853634233",
-      appId: "1:492853634233:web:31bd69c07af243ea746768",
-      measurementId: "G-9849VJZCSX"
-    };
+  // ---------- Firebase config (same project) ----------
+  const firebaseConfig = {
+    apiKey: "AIzaSyBz5muqVYqFi9VHCmcM6fAgrLhvZ24rvX0",
+    authDomain: "mwosiemo-ae343.firebaseapp.com",
+    databaseURL: "https://mwosiemo-ae343-default-rtdb.europe-west1.firebasedatabase.app/",
+    projectId: "mwosiemo-ae343",
+    storageBucket: "mwosiemo-ae343.appspot.com",
+    messagingSenderId: "492853634233",
+    appId: "1:492853634233:web:31bd69c07af243ea746768",
+    measurementId: "G-9849VJZCSX"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+  // ---------- Elements ----------
+  const startBtn = document.getElementById('startBtn');
+  const boxCountInput = document.getElementById('boxCount');
+  const playerListDiv = document.getElementById('playerList');
+  const statsDiv = document.getElementById('stats');
+  const banner = document.getElementById('banner');
 
-    // 🔹 Start new round
-    document.getElementById("startRoundBtn").addEventListener("click", () => {
-      const totalBoxes = parseInt(document.getElementById("boxCount").value);
-      if (!totalBoxes || totalBoxes < 1) {
-        alert("Please enter a valid number of boxes.");
-        return;
-      }
+  // ---------- Start new round ----------
+  startBtn.addEventListener('click', () => {
+    const total = parseInt(boxCountInput.value);
+    if (!total || total < 1) { alert('Enter number of boxes'); return; }
+    const winningBox = Math.floor(Math.random()*total) + 1;
 
-      // Random winning box
-      const winningBox = Math.floor(Math.random() * totalBoxes) + 1;
-
-      // Update Firebase
-      db.ref("gameSettings").set({
-        totalBoxes: totalBoxes,
-        winningBox: winningBox,
-        winnerFound: false
-      });
-
-      // Clear previous players
-      db.ref("players").remove();
-
-      alert(`✅ New round started with ${totalBoxes} boxes!`);
+    // reset nodes and set new settings
+    db.ref().update({
+      'gameSettings/totalBoxes': total,
+      'gameSettings/winningBox': winningBox,
+      'gameSettings/winnerFound': false,
+      'gameSettings/winnerName': null
     });
 
-    const playerListDiv = document.getElementById("playerList");
+    // clear players & boxes & notifications
+    db.ref('players').remove();
+    db.ref('boxes').remove();
+    db.ref('adminNotifications').remove();
 
-    // 🔹 Display players in real time with winner highlight
-    db.ref("players").on("value", (snapshot) => {
-      const players = snapshot.val() || {};
-      const winnerData = {};
+    statsDiv.textContent = `Round started — ${total} boxes. (winning box chosen secretly)`;
+    playerListDiv.innerHTML = 'Waiting for players...';
+  });
 
-      // Check if winner is found
-      db.ref("gameSettings").once("value").then(settingsSnap => {
-        const settings = settingsSnap.val();
-        if (settings && settings.winnerFound) {
-          winnerData.box = settings.winningBox;
-          winnerData.player = Object.entries(players).find(([name, info]) => info.box === settings.winningBox)?.[0];
-        }
+  // ---------- Show live players ----------
+  db.ref('players').on('value', snap => {
+    const players = snap.val() || {};
+    const entries = Object.entries(players);
+    if (entries.length === 0) {
+      playerListDiv.innerHTML = 'Waiting for players...';
+      return;
+    }
 
-        if (Object.keys(players).length === 0) {
-          playerListDiv.textContent = "Waiting for players...";
-          return;
-        }
+    // get winner info to highlight
+    db.ref('gameSettings').once('value').then(gs => {
+      const g = gs.val() || {};
+      const winnerBox = g.winningBox;
+      const winnerFound = g.winnerFound;
+      const winnerName = g.winnerName;
 
-        playerListDiv.innerHTML = "<ul>" +
-          Object.entries(players).map(([name, info]) => {
-            let className = "";
-            let winnerText = "";
-            if (winnerData.player === name) {
-              className = "winner";
-              winnerText = " 🎉 Winner";
-            }
-            return `<li class="${className}"><b>${name}</b> → Box ${info.box}${winnerText}</li>`;
-          }).join("") +
-        "</ul>";
-      });
+      playerListDiv.innerHTML = entries.map(([name, info])=>{
+        const isWinner = (winnerFound && winnerName === name);
+        return `<div class="player-item ${isWinner ? 'winner' : ''}">
+                  <div>${name}</div>
+                  <div>${info.box} ${isWinner ? ' 🎉 Winner' : ''}</div>
+                </div>`;
+      }).join('');
     });
+  });
 
-    // 🔹 Optional: Listen for admin notifications in real time
-    db.ref("adminNotifications").on("child_added", (snap) => {
-      const data = snap.val();
-      console.log("Winner notified:", data);
-      // Could trigger additional alerts if desired
-    });
+  // ---------- Listen for admin notifications (when a winner is found) ----------
+  db.ref('adminNotifications').on('child_added', snap => {
+    const d = snap.val();
+    if (!d) return;
+    showBanner(`⭐ ${d.winner} won Box #${d.winningBox} 🎉`);
+    // also update gameSettings winnerName for consistent highlighting
+    db.ref('gameSettings').update({ winnerFound: true, winnerName: d.winner });
+  });
+
+  // ---------- Listen gameSettings winnerFound to show banner (in case winner set directly) ----------
+  db.ref('gameSettings').on('value', snap => {
+    const settings = snap.val() || {};
+    if (settings.winnerFound && settings.winnerName) {
+      showBanner(`⭐ ${settings.winnerName} won Box #${settings.winningBox} 🎉`);
+      statsDiv.textContent = `Round over — winner: ${settings.winnerName} (Box ${settings.winningBox})`;
+    } else if (settings.totalBoxes) {
+      statsDiv.textContent = `Round active — boxes: ${settings.totalBoxes}`;
+    } else {
+      statsDiv.textContent = 'No round active';
+    }
+  });
+
+  function showBanner(text) {
+    banner.textContent = text;
+    banner.style.display = 'block';
+    banner.style.opacity = '1';
+    // fade after 5s
+    setTimeout(()=> {
+      banner.style.transition = 'opacity .8s';
+      banner.style.opacity = '0';
+      setTimeout(()=> banner.style.display='none', 900);
+    }, 5000);
+  }
   </script>
 </body>
 </html>
