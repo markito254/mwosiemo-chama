@@ -36,6 +36,11 @@
       padding: 15px;
       border-radius: 8px;
       box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      min-width: 300px;
+    }
+    .winner {
+      background-color: lightgreen;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -55,7 +60,7 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
   <script>
-    // ✅ Firebase configuration
+    // ✅ Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyBz5muqVYqFi9VHCmcM6fAgrLhvZ24rvX0",
       authDomain: "mwosiemo-ae343.firebaseapp.com",
@@ -67,11 +72,10 @@
       measurementId: "G-9849VJZCSX"
     };
 
-    // ✅ Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 🔹 STEP 2: Start a new round
+    // 🔹 Start new round
     document.getElementById("startRoundBtn").addEventListener("click", () => {
       const totalBoxes = parseInt(document.getElementById("boxCount").value);
       if (!totalBoxes || totalBoxes < 1) {
@@ -79,34 +83,61 @@
         return;
       }
 
-      // Randomly pick a winning box
+      // Random winning box
       const winningBox = Math.floor(Math.random() * totalBoxes) + 1;
 
-      // Update game settings in database
+      // Update Firebase
       db.ref("gameSettings").set({
         totalBoxes: totalBoxes,
-        winningBox: winningBox
+        winningBox: winningBox,
+        winnerFound: false
       });
 
-      // Clear old players
+      // Clear previous players
       db.ref("players").remove();
 
       alert(`✅ New round started with ${totalBoxes} boxes!`);
     });
 
-    // 🔹 STEP 3: Display players’ selections in real time
     const playerListDiv = document.getElementById("playerList");
+
+    // 🔹 Display players in real time with winner highlight
     db.ref("players").on("value", (snapshot) => {
-      const data = snapshot.val();
-      if (!data) {
-        playerListDiv.textContent = "Waiting for players...";
-        return;
-      }
-      playerListDiv.innerHTML = "<ul>" +
-        Object.entries(data).map(([name, info]) =>
-          `<li><b>${name}</b> → Box ${info.box}</li>`
-        ).join("") +
-      "</ul>";
+      const players = snapshot.val() || {};
+      const winnerData = {};
+
+      // Check if winner is found
+      db.ref("gameSettings").once("value").then(settingsSnap => {
+        const settings = settingsSnap.val();
+        if (settings && settings.winnerFound) {
+          winnerData.box = settings.winningBox;
+          winnerData.player = Object.entries(players).find(([name, info]) => info.box === settings.winningBox)?.[0];
+        }
+
+        if (Object.keys(players).length === 0) {
+          playerListDiv.textContent = "Waiting for players...";
+          return;
+        }
+
+        playerListDiv.innerHTML = "<ul>" +
+          Object.entries(players).map(([name, info]) => {
+            let className = "";
+            let winnerText = "";
+            if (winnerData.player === name) {
+              className = "winner";
+              winnerText = " 🎉 Winner";
+            }
+            return `<li class="${className}"><b>${name}</b> → Box ${info.box}${winnerText}</li>`;
+          }).join("") +
+        "</ul>";
+      });
+    });
+
+    // 🔹 Optional: Listen for admin notifications in real time
+    db.ref("adminNotifications").on("child_added", (snap) => {
+      const data = snap.val();
+      console.log("Winner notified:", data);
+      // Could trigger additional alerts if desired
     });
   </script>
 </body>
