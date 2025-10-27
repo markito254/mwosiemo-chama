@@ -1,208 +1,297 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lucky Box Challenge</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lucky Box — Player</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      background: #f4f4f4;
-    }
-    h1 {
-      color: #333;
-    }
-    #boxes {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-      gap: 10px;
-      max-width: 400px;
-      margin: 20px auto;
-    }
+    body { font-family: Arial, sans-serif; text-align:center; background:#f4f4f4; padding:18px;}
+    h1 { color:#333; margin-bottom:6px; }
+    #boxes { display:grid; grid-template-columns:repeat(auto-fit,minmax(80px,1fr)); gap:10px; max-width:520px; margin:18px auto; }
     .box {
-      background-color: gold;
-      padding: 20px;
-      border-radius: 10px;
-      cursor: pointer;
-      position: relative;
-      transition: transform 0.2s, background-color 0.2s;
+      background:gold; padding:18px; border-radius:10px; cursor:pointer; position:relative;
+      transition: transform .2s, background-color .2s, opacity .2s;
+      font-weight:700; font-size:20px;
     }
-    .box:hover {
-      transform: scale(1.1);
-    }
-    .winner {
-      background-color: lightgreen !important;
-    }
-    .loser {
-      background-color: #ff8a8a !important;
-    }
-    .disabled {
-      pointer-events: none;
-      opacity: 0.6;
-    }
-    canvas {
-      position: absolute;
-      top: -20px;
-      left: 50%;
-      transform: translateX(-50%);
-      pointer-events: none;
-    }
+    .box:hover { transform:translateY(-6px); }
+    .disabled { pointer-events:none; opacity:.55; }
+    .winner { background: #3ac569 !important; color: #fff; }
+    .loser { background:#ff8a8a !important; color:#fff; }
+    .wiggle { animation: wiggle .9s ease; }
+    @keyframes wiggle { 0%{transform:rotate(0)}20%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}80%{transform:rotate(-4deg)}100%{transform:rotate(0)}}
+    /* confetti canvas inside box */
+    .confetti-canvas { position:absolute; top:-90px; left:50%; transform:translateX(-50%); pointer-events:none; width:150px; height:100px; }
+    #status { margin-top:12px; color:#333; }
   </style>
 </head>
 <body>
   <h1>Lucky Box Challenge 🎁</h1>
   <p id="welcome"></p>
   <div id="boxes"></div>
+  <div id="status"></div>
 
-  <!-- Firebase SDK -->
+  <!-- Firebase SDK v8 -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
   <script>
-    // ✅ Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyBz5muqVYqFi9VHCmcM6fAgrLhvZ24rvX0",
-      authDomain: "mwosiemo-ae343.firebaseapp.com",
-      databaseURL: "https://mwosiemo-ae343-default-rtdb.europe-west1.firebasedatabase.app/",
-      projectId: "mwosiemo-ae343",
-      storageBucket: "mwosiemo-ae343.appspot.com",
-      messagingSenderId: "492853634233",
-      appId: "1:492853634233:web:31bd69c07af243ea746768",
-      measurementId: "G-9849VJZCSX"
-    };
+  // ---------- Firebase config (already set for your project) ----------
+  const firebaseConfig = {
+    apiKey: "AIzaSyBz5muqVYqFi9VHCmcM6fAgrLhvZ24rvX0",
+    authDomain: "mwosiemo-ae343.firebaseapp.com",
+    databaseURL: "https://mwosiemo-ae343-default-rtdb.europe-west1.firebasedatabase.app/",
+    projectId: "mwosiemo-ae343",
+    storageBucket: "mwosiemo-ae343.appspot.com",
+    messagingSenderId: "492853634233",
+    appId: "1:492853634233:web:31bd69c07af243ea746768",
+    measurementId: "G-9849VJZCSX"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+  // ---------- Player identity ----------
+  let playerName = prompt("Enter your name:");
+  if (!playerName) playerName = "Player" + Math.floor(Math.random()*1000);
+  document.getElementById('welcome').textContent = `Welcome, ${playerName}!`;
 
-    // Ask for player name
-    const playerName = prompt("Enter your name:");
-    document.getElementById("welcome").textContent = `Welcome, ${playerName}!`;
+  // ---------- Utility: short ding sound (Web Audio) ----------
+  function playDing() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = 880;
+      g.gain.value = 0;
+      o.connect(g);
+      g.connect(ctx.destination);
+      const now = ctx.currentTime;
+      g.gain.linearRampToValueAtTime(0.0001, now);
+      g.gain.linearRampToValueAtTime(0.12, now + 0.005);
+      o.start(now);
+      o.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+      setTimeout(()=>{ o.stop(); ctx.close(); }, 700);
+    } catch(e){}
+  }
 
-    // 🔹 Render boxes based on game settings
-    db.ref("gameSettings/totalBoxes").on("value", (snapshot) => {
-      const total = snapshot.val();
-      if (!total) return;
-      const boxesDiv = document.getElementById("boxes");
-      boxesDiv.innerHTML = "";
+  // ---------- Render boxes & live updates ----------
+  let totalBoxes = 0;
+  const boxesDiv = document.getElementById('boxes');
+  const statusDiv = document.getElementById('status');
 
-      for (let i = 1; i <= total; i++) {
-        const box = document.createElement("div");
-        box.textContent = i;
-        box.classList.add("box");
-        box.id = `box-${i}`;
-        box.onclick = () => selectBox(i, box);
-        boxesDiv.appendChild(box);
-      }
+  // Keep listeners references so we don't attach duplicates
+  let gameSettingsListener = null;
+  let boxesListener = null;
+  let playersListener = null;
 
-      // Update box states live
-      db.ref("players").on("value", (snap) => {
-        const players = snap.val() || {};
-        const chosenBoxes = Object.values(players).map(p => p.box);
-
-        document.querySelectorAll(".box").forEach(b => {
-          const num = parseInt(b.textContent);
-          if (chosenBoxes.includes(num)) {
-            b.classList.add("disabled");
-            b.onclick = null;
-          }
-        });
-
-        // If all boxes are taken
-        if (chosenBoxes.length === total) {
-          alert("All boxes taken — wait for admin to start the next round.");
+  function attachListeners() {
+    // Listen to entire gameSettings for totalBoxes, winningBox and winnerFound
+    if (gameSettingsListener) return;
+    gameSettingsListener = db.ref('gameSettings');
+    gameSettingsListener.on('value', snap => {
+      const settings = snap.val() || {};
+      if (settings.totalBoxes) {
+        if (settings.totalBoxes !== totalBoxes) {
+          totalBoxes = settings.totalBoxes;
+          renderBoxes(totalBoxes);
         }
-      });
+      }
+      // If winner found, show global state
+      if (settings.winnerFound) {
+        statusDiv.textContent = `Round over — winner: ${settings.winnerName || 'Unknown'}`;
+      } else {
+        statusDiv.textContent = `Round active — boxes: ${settings.totalBoxes || 0}`;
+      }
+    });
 
-      // Listen for winner broadcast
-      db.ref("gameSettings/winnerFound").on("value", (snap) => {
-        if (snap.val()) {
-          db.ref("gameSettings/winningBox").once("value").then(s => {
-            const winBox = s.val();
-            const box = document.getElementById(`box-${winBox}`);
-            if (box) {
-              showConfetti(box);
-              box.classList.add("winner");
-              alert(`🎉 Box ${winBox} is the winner!`);
-              document.querySelectorAll(".box").forEach(b => b.onclick = null);
-            }
-          });
+    // Listen for boxes taken (map of boxNumber => playerName)
+    boxesListener = db.ref('boxes');
+    boxesListener.on('value', snap => {
+      const taken = snap.val() || {};
+      document.querySelectorAll('.box').forEach(b => {
+        const n = parseInt(b.dataset.box);
+        if (taken[n]) {
+          b.classList.add('disabled');
+          b.onclick = null;
+          // If this player's pick, show their state immediately
+          if (taken[n] === playerName) {
+            b.classList.add('disabled'); // own pick
+          }
+        } else {
+          // only enable if round is active and not already picked by this client
+          if (!b.classList.contains('winner') && !b.classList.contains('loser')) {
+            b.classList.remove('disabled');
+            b.onclick = () => selectBox(n, b);
+          }
         }
       });
     });
 
-    // 🔹 Handle selection
-    function selectBox(number, box) {
-      db.ref("gameSettings").once("value").then(snapshot => {
-        const settings = snapshot.val();
-        if (!settings || !settings.winningBox) {
-          alert("Game not started yet. Wait for admin.");
+    // Listen players node for count checks and winner announcements
+    playersListener = db.ref('players');
+    playersListener.on('value', snap => {
+      const players = snap.val() || {};
+      const chosenBoxes = Object.values(players).map(p => p.box);
+      // If boxes full, update status
+      if (totalBoxes && chosenBoxes.length >= totalBoxes) {
+        statusDiv.textContent = "All boxes taken — wait for admin to start next round.";
+      }
+    });
+
+    // Listen for winnerFound to show confetti if this client is not the picker
+    db.ref('gameSettings/winnerFound').on('value', wsnap => {
+      if (wsnap.val()) {
+        db.ref('gameSettings/winningBox').once('value').then(s => {
+          const winBox = s.val();
+          if (!winBox) return;
+          const el = document.querySelector(`.box[data-box='${winBox}']`);
+          if (el) {
+            // show confetti and highlight (if not already)
+            el.classList.add('winner');
+            showConfetti(el);
+            playDing();
+            // disable all boxes
+            document.querySelectorAll('.box').forEach(b => b.onclick = null);
+          }
+        });
+      }
+    });
+  }
+
+  function renderBoxes(n) {
+    boxesDiv.innerHTML = '';
+    for (let i=1;i<=n;i++){
+      const d = document.createElement('div');
+      d.className = 'box';
+      d.dataset.box = i;
+      d.textContent = i;
+      d.onclick = () => selectBox(i,d);
+      boxesDiv.appendChild(d);
+    }
+  }
+
+  // ---------- Select a box (uses transaction to lock box globally) ----------
+  function selectBox(number, boxEl) {
+    // Add wiggle animation for suspense
+    boxEl.classList.add('wiggle');
+
+    // Disable clicking locally during suspense
+    document.querySelectorAll('.box').forEach(b=>b.onclick = null);
+
+    // 1 second suspense, then attempt to claim
+    setTimeout(() => {
+      boxEl.classList.remove('wiggle');
+
+      const boxRef = db.ref(`boxes/${number}`);
+      boxRef.transaction(current => {
+        if (current === null) return playerName;
+        return; // abort if already taken
+      }, (err, committed, snapshot) => {
+        if (err) {
+          alert('Network error — try again.');
+          // re-enable local clicks (some boxes might be disabled by DB listeners)
+          attachListeners(); // listeners will set correct handlers
+          return;
+        }
+        if (!committed) {
+          alert('That box was just taken by someone else!');
+          attachListeners();
           return;
         }
 
-        // Prevent double-picking
-        db.ref("players").once("value").then(playersSnap => {
-          const players = playersSnap.val() || {};
-          const chosen = Object.values(players).map(p => p.box);
-          if (chosen.includes(number)) {
-            alert("That box is already taken!");
+        // Success: write to players and evaluate win
+        db.ref(`players/${playerName}`).set({ box: number, timestamp: Date.now() });
+
+        // read winningBox and winnerFound
+        db.ref('gameSettings').once('value').then(snap => {
+          const settings = snap.val() || {};
+          const winningBox = settings.winningBox;
+          const winnerFound = settings.winnerFound;
+          if (winnerFound) {
+            // someone already won; this pick is late
+            boxEl.classList.add(number === winningBox ? 'winner' : 'loser');
             return;
           }
 
-          db.ref(`players/${playerName}`).set({ box: number });
-
-          const isWinner = number === settings.winningBox;
-          box.classList.add(isWinner ? "winner" : "loser");
-          document.querySelectorAll(".box").forEach(b => b.onclick = null);
-
-          if (isWinner) {
-            showConfetti(box);
-            alert("🎉 Congratulations! You won!");
-            db.ref("gameSettings/winnerFound").set(true);
-            db.ref("adminNotifications").push({
+          if (number === winningBox) {
+            // This player wins — set winnerFound atomically
+            db.ref('gameSettings').update({ winnerFound: true, winnerName: playerName });
+            // notify admin (push notification entry)
+            db.ref('adminNotifications').push({
               winner: playerName,
               winningBox: number,
               timestamp: Date.now()
             });
+            // Show confetti + ding + final highlight
+            boxEl.classList.add('winner');
+            showConfetti(boxEl);
+            playDing();
+            alert('🎉 Congratulations! You won!');
+            // disable all boxes
+            document.querySelectorAll('.box').forEach(b=>b.onclick = null);
           } else {
-            alert("😢 Better luck next time!");
+            boxEl.classList.add('loser');
+            alert('😢 Better luck next time!');
           }
         });
       });
+    }, 1000); // suspense delay
+  }
+
+  // ---------- Lightweight confetti that appears above the winning box ----------
+  function showConfetti(boxEl) {
+    // create canvas
+    const canvas = document.createElement('canvas');
+    canvas.className = 'confetti-canvas';
+    canvas.width = 150;
+    canvas.height = 100;
+    boxEl.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+
+    const particles = [];
+    const colors = ['#ff4757','#ffa502','#ff6b81','#2ed573','#1e90ff','#a29bfe'];
+
+    for (let i=0;i<20;i++) {
+      particles.push({
+        x: Math.random()*canvas.width,
+        y: Math.random()*canvas.height*0.4,
+        vx: (Math.random()-0.5)*2,
+        vy: Math.random()*2+1,
+        r: Math.random()*3+2,
+        c: colors[Math.floor(Math.random()*colors.length)],
+        life: Math.random()*60+60
+      });
     }
 
-    // 🎊 Lightweight confetti above winner's box
-    function showConfetti(box) {
-      const canvas = document.createElement("canvas");
-      canvas.width = 150;
-      canvas.height = 100;
-      box.appendChild(canvas);
-      const ctx = canvas.getContext("2d");
-
-      const confetti = Array.from({ length: 20 }, () => ({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        r: Math.random() * 3 + 2,
-        c: `hsl(${Math.random() * 360}, 100%, 50%)`,
-        s: Math.random() * 2 + 1
-      }));
-
-      function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        confetti.forEach(p => {
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r, 0, 2 * Math.PI);
-          ctx.fillStyle = p.c;
-          ctx.fill();
-          p.y += p.s;
-          if (p.y > canvas.height) p.y = 0;
-        });
-        requestAnimationFrame(animate);
-      }
-      animate();
-
-      setTimeout(() => canvas.remove(), 4000);
+    let raf;
+    function draw() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      particles.forEach(p=>{
+        ctx.fillStyle = p.c;
+        ctx.beginPath();
+        ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+        ctx.fill();
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.04;
+        p.life--;
+      });
+      // remove expired
+      for (let i = particles.length-1; i>=0; i--) if (particles[i].life<=0) particles.splice(i,1);
+      if (particles.length>0) raf = requestAnimationFrame(draw); else cleanup();
     }
+    function cleanup(){
+      cancelAnimationFrame(raf);
+      if (canvas.parentNode) canvas.remove();
+    }
+    draw();
+    // auto remove after 3.2s
+    setTimeout(()=>{ if (canvas.parentNode) canvas.remove(); }, 3200);
+  }
+
+  // Initialize listeners once page loads
+  attachListeners();
   </script>
 </body>
 </html>
